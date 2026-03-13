@@ -1,0 +1,5 @@
+kind: "AppHostingConfig"
+schemaVersion: "v1"
+environmentVariables:
+  - variable: "USE_FIRESTORE"
+    value: "true"
