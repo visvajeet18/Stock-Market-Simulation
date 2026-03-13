@@ -20,16 +20,15 @@ export async function readDB(filename: string) {
                 return [];
             }
             
-            // For simple arrays (users, stocks, etc), we map the docs
-            // For single objects like market_state, we take the first doc or a specific doc
             if (filename === 'market_state.json') {
-                return snapshot.docs[0].data();
+                const currentDoc = snapshot.docs.find(d => d.id === 'current');
+                return currentDoc ? currentDoc.data() : snapshot.docs[0].data();
             }
             
             return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         } catch (error) {
             console.error(`Firestore Read Error [${collectionName}]:`, error);
-            throw error;
+            return filename === 'market_state.json' ? {} : [];
         }
     }
 
@@ -58,14 +57,10 @@ export async function writeDB(filename: string, data: any) {
                 const docRef = db.collection(collectionName).doc('current');
                 batch.set(docRef, data);
             } else if (Array.isArray(data)) {
-                // Clear and Rewrite Strategy for Arrays (Simple for prototype)
-                // Note: For large datasets, this should be document-based updates
-                const snapshot = await db.collection(collectionName).get();
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
-                
+                // Optimized Update: Set documents without deleting the entire collection
                 data.forEach(item => {
                     const id = item.id ? String(item.id) : db.collection(collectionName).doc().id;
-                    const { id: _, ...cleanItem } = item; // Don't save id inside data
+                    const { id: _, ...cleanItem } = item;
                     batch.set(db.collection(collectionName).doc(id), cleanItem);
                 });
             }
