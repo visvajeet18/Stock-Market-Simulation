@@ -9,23 +9,35 @@ const writeLocks: Record<string, Promise<void>> = {};
 
 const USE_FIRESTORE = process.env.USE_FIRESTORE === 'true' || process.env.NODE_ENV === 'production';
 
+// ─── Simple In-Memory Cache ──────────────────────────────────────────────────
+const cache: Record<string, { data: any; expires: number }> = {};
+const CACHE_TTL = 2000; // 2 seconds cache for reads
+
 export async function readDB(filename: string) {
     const collectionName = filename.replace('.json', '');
-    
+
     if (USE_FIRESTORE) {
+        // Check cache first
+        if (cache[filename] && cache[filename].expires > Date.now()) {
+            return cache[filename].data;
+        }
+
         try {
             const snapshot = await db.collection(collectionName).get();
+            let result: any;
+
             if (snapshot.empty) {
-                if (filename === 'market_state.json') return {};
-                return [];
-            }
-            
-            if (filename === 'market_state.json') {
+                result = filename === 'market_state.json' ? {} : [];
+            } else if (filename === 'market_state.json') {
                 const currentDoc = snapshot.docs.find(d => d.id === 'current');
-                return currentDoc ? currentDoc.data() : snapshot.docs[0].data();
+                result = currentDoc ? currentDoc.data() : snapshot.docs[0].data();
+            } else {
+                result = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             }
-            
-            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+            // Update cache
+            cache[filename] = { data: result, expires: Date.now() + CACHE_TTL };
+            return result;
         } catch (error) {
             console.error(`Firestore Read Error [${collectionName}]:`, error);
             return filename === 'market_state.json' ? {} : [];

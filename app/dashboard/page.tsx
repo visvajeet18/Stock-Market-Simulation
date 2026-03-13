@@ -61,7 +61,6 @@ export default function Dashboard() {
         fetchStocks();
         fetchLoans(parsedUser.id);
         fetchUser(parsedUser.id);
-
         const interval = setInterval(() => {
             fetchStocks();
             fetchLoans(parsedUser.id);
@@ -69,10 +68,12 @@ export default function Dashboard() {
             fetchAnnouncements();
             fetchMarketState();
             fetchOrders(parsedUser.id);
-        }, 5000);
+        }, 30000); // 30s polling for non-admin to save quota
+        
         fetchAnnouncements();
         fetchMarketState();
         fetchOrders(parsedUser.id);
+        
         return () => clearInterval(interval);
     }, [router]);
 

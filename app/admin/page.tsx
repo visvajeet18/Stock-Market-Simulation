@@ -46,13 +46,21 @@ export default function AdminDashboard() {
         if (parsedUser.role !== 'admin') { router.push('/dashboard'); return; }
 
         fetchAll();
-        const tickAndFetch = async () => {
-            await fetch('/api/admin/stocks/tick', { method: 'POST' });
-            fetchAll();
-        };
-        const ti = setInterval(tickAndFetch, 2000);
+        const ti = setInterval(fetchSnapshot, 15000); // Poll every 15s instead of 2s to save Firestore quota
         return () => clearInterval(ti);
     }, [router]);
+
+    const fetchSnapshot = async () => {
+        // Just fetch stats, don't trigger a tick automatically to save quota
+        fetchAll();
+    };
+
+    const triggerManualTick = async () => {
+        setLoading(true);
+        await fetch('/api/admin/stocks/tick', { method: 'POST' });
+        await fetchAll();
+        setLoading(false);
+    };
 
     const fetchAll = async () => {
         try {
@@ -272,6 +280,9 @@ export default function AdminDashboard() {
                 </div>
                 <div className="nav-links">
                     <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Administrator</span>
+                    <button className="nav-btn" onClick={triggerManualTick} style={{ background: 'var(--accent)', color: '#0f172a' }} disabled={loading}>
+                        {loading ? '⏳ Updating...' : '⚡ Force Market Tick'}
+                    </button>
                     <button className="nav-btn" onClick={() => { localStorage.removeItem('user'); router.push('/'); }}>Logout</button>
                 </div>
             </nav>
