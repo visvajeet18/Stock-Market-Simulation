@@ -173,7 +173,7 @@ export default function Dashboard() {
         const sounds = {
             buy: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
             profit: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3', // Alert/Drop (User preferred for Profit)
-            loss: 'https://assets.mixkit.co/active_storage/sfx/2006/2006-preview.mp3', // Negative notification (New Loss)
+            loss: 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3', // Short digital notification (New Loss)
             coins: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'
         };
         const audio = new Audio(sounds[type]);

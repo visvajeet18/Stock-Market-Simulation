@@ -71,7 +71,13 @@ export default function LoansDashboard() {
             const res = await fetch(`/api/loans?userId=${userId}`);
             const data = await res.json();
             if (res.ok) {
-                setLoans(data);
+                // Sort by timestamp DESC - newest first
+                const sorted = Array.isArray(data) ? [...data].sort((a, b) => {
+                    const tA = new Date(a.timestamp || 0).getTime();
+                    const tB = new Date(b.timestamp || 0).getTime();
+                    return tB - tA;
+                }) : [];
+                setLoans(sorted);
             }
         } catch (err) {
             console.error('Failed to fetch loans');

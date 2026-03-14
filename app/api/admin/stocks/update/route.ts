@@ -32,6 +32,11 @@ export async function POST(request: Request) {
                 return NextResponse.json({ error: 'Invalid quantity value' }, { status: 400 });
             }
             stock.availableQuantity = Math.floor(value);
+        } else if (action === 'EDIT_META') {
+            const { name, logoUrl, description } = value || {};
+            if (name) stock.name = name;
+            if (logoUrl) stock.logoUrl = logoUrl;
+            if (description) stock.description = description;
         } else if (action === 'HIKE' || action === 'DROP') {
             const percentage = typeof value === 'number' ? value : 5; // Default 5%
             const multiplier = action === 'HIKE' ? (1 + percentage / 100) : (1 - percentage / 100);

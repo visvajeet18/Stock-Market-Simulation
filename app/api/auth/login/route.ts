@@ -2,12 +2,11 @@ export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { readDB } from '@/lib/db';
 
-// Hardcoded admin for simplicity as requested
 const ADMIN_CREDENTIALS = {
     id: 'admin-001',
     name: 'Administrator',
     username: 'admin',
-    password: 'adminpassword',
+    password: 'fin@krct.sim',
     role: 'admin'
 };
 
@@ -40,4 +39,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-
