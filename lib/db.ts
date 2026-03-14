@@ -1,13 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { db } from './firebase-admin';
+import crypto from 'crypto';
+import { supabase } from './supabase';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
 // Per-file write lock to prevent concurrent writes corrupting JSON (Local only)
 const writeLocks: Record<string, Promise<void>> = {};
 
-const USE_FIRESTORE = process.env.USE_FIRESTORE === 'true' || process.env.NODE_ENV === 'production';
+const USE_CLOUD_DB = process.env.USE_FIRESTORE === 'true' || process.env.NODE_ENV === 'production';
 
 // ─── Simple In-Memory Cache ──────────────────────────────────────────────────
 const cache: Record<string, { data: any; expires: number }> = {};
@@ -16,30 +17,31 @@ const CACHE_TTL = 2000; // 2 seconds cache for reads
 export async function readDB(filename: string) {
     const collectionName = filename.replace('.json', '');
 
-    if (USE_FIRESTORE) {
+    if (USE_CLOUD_DB) {
         // Check cache first
         if (cache[filename] && cache[filename].expires > Date.now()) {
             return cache[filename].data;
         }
 
         try {
-            const snapshot = await db.collection(collectionName).get();
+            const { data: snapshot, error } = await supabase.from(collectionName).select('*');
+            if (error) throw error;
             let result: any;
 
-            if (snapshot.empty) {
+            if (!snapshot || snapshot.length === 0) {
                 result = filename === 'market_state.json' ? {} : [];
             } else if (filename === 'market_state.json') {
-                const currentDoc = snapshot.docs.find(d => d.id === 'current');
-                result = currentDoc ? currentDoc.data() : snapshot.docs[0].data();
+                const currentDoc = snapshot.find((d: any) => d.id === 'current');
+                result = currentDoc ? currentDoc.data : snapshot[0].data;
             } else {
-                result = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                result = snapshot.map((doc: any) => ({ id: doc.id, ...doc.data }));
             }
 
             // Update cache
             cache[filename] = { data: result, expires: Date.now() + CACHE_TTL };
             return result;
         } catch (error) {
-            console.error(`Firestore Read Error [${collectionName}]:`, error);
+            console.error(`Supabase Read Error [${collectionName}]:`, error);
             return filename === 'market_state.json' ? {} : [];
         }
     }
@@ -61,26 +63,26 @@ export async function readDB(filename: string) {
 export async function writeDB(filename: string, data: any) {
     const collectionName = filename.replace('.json', '');
 
-    if (USE_FIRESTORE) {
+    if (USE_CLOUD_DB) {
         try {
-            const batch = db.batch();
-            
             if (filename === 'market_state.json') {
-                const docRef = db.collection(collectionName).doc('current');
-                batch.set(docRef, data);
+                const { error } = await supabase.from(collectionName).upsert({ id: 'current', data });
+                if (error) throw error;
             } else if (Array.isArray(data)) {
                 // Optimized Update: Set documents without deleting the entire collection
-                data.forEach(item => {
-                    const id = item.id ? String(item.id) : db.collection(collectionName).doc().id;
+                const payload = data.map(item => {
+                    const id = item.id ? String(item.id) : crypto.randomUUID();
                     const { id: _, ...cleanItem } = item;
-                    batch.set(db.collection(collectionName).doc(id), cleanItem);
+                    return { id, data: cleanItem };
                 });
+                
+                const { error } = await supabase.from(collectionName).upsert(payload);
+                if (error) throw error;
             }
             
-            await batch.commit();
             return;
         } catch (error) {
-            console.error(`Firestore Write Error [${collectionName}]:`, error);
+            console.error(`Supabase Write Error [${collectionName}]:`, error);
             throw error;
         }
     }
@@ -96,3 +98,4 @@ export async function writeDB(filename: string, data: any) {
     writeLocks[filename] = next.catch(() => { });
     return next;
 }
+
