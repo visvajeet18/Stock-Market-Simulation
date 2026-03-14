@@ -568,6 +568,7 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.9rem' }}>₹{stats_defaultStockPrices[symbol].toFixed(2)}</div>
+                                                    <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>Vol: {(meta.availableQuantity || 0).toLocaleString()}</div>
                                                     {halted && <span style={{ fontSize: '0.6rem', color: '#f59e0b', fontWeight: 600 }}>⏯ HALTED</span>}
                                                 </div>
                                             </div>
@@ -586,6 +587,10 @@ export default function AdminDashboard() {
                                                 <button onClick={() => handleStockUpdate(symbol, 'TOGGLE_AUTO', !isAuto)}
                                                     style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: isAuto ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.15)', color: isAuto ? 'var(--success)' : '#94a3b8', border: `1px solid ${isAuto ? 'var(--success)' : '#475569'}`, borderRadius: '4px', cursor: 'pointer' }}>
                                                     {isAuto ? 'Auto' : 'Manual'}
+                                                </button>
+                                                <button onClick={() => { const v = prompt(`Set total shares for ${symbol}:`, meta.availableQuantity || 1000000); if (v && !isNaN(Number(v))) handleStockUpdate(symbol, 'SET_QUANTITY', Number(v)); }}
+                                                    style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid #f97316', borderRadius: '4px', cursor: 'pointer' }}>
+                                                    Set Qty
                                                 </button>
                                                 <button onClick={() => handleDeleteStock(symbol)}
                                                     style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '4px', cursor: 'pointer' }}>

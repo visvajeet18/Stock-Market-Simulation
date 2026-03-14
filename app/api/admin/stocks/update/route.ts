@@ -27,6 +27,11 @@ export async function POST(request: Request) {
             }
             stock.price = Math.round(value * 100) / 100;
             stock.autoUpdate = false; // Disable auto-update when manual price is set
+        } else if (action === 'SET_QUANTITY') {
+            if (typeof value !== 'number' || value < 0) {
+                return NextResponse.json({ error: 'Invalid quantity value' }, { status: 400 });
+            }
+            stock.availableQuantity = Math.floor(value);
         } else if (action === 'HIKE' || action === 'DROP') {
             const percentage = typeof value === 'number' ? value : 5; // Default 5%
             const multiplier = action === 'HIKE' ? (1 + percentage / 100) : (1 - percentage / 100);
@@ -66,4 +71,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-
