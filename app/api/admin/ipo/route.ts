@@ -5,7 +5,7 @@ import { readDB, writeDB } from '@/lib/db';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { adminId, symbol, name, sector, initialPrice, shares } = body;
+        const { adminId, symbol, name, sector, initialPrice, shares, logoUrl } = body;
 
         if (!adminId || !symbol || !name || !sector || !initialPrice || !shares) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
@@ -25,11 +25,12 @@ export async function POST(request: Request) {
             previousPrice: Number(initialPrice),
             history: [Number(initialPrice)],
             autoUpdate: true,
-            volatility: 0.05, // IPOs are slightly more volatile initially
+            volatility: 0.05,
             beta: 1.5,
             weekHigh52: Number(initialPrice) * 1.5,
             weekLow52: Number(initialPrice) * 0.8,
-            availableQuantity: Number(shares)
+            availableQuantity: Number(shares),
+            logoUrl: logoUrl || `https://logo.clearbit.com/${name.toLowerCase().replace(/\s+/g, '')}.com`
         };
 
         stocks.push(newStock);
@@ -66,4 +67,3 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-

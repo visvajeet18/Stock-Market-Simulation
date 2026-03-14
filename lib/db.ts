@@ -71,23 +71,18 @@ export async function writeDB(filename: string, data: any) {
                 const { error } = await supabase.from(collectionName).upsert({ id: 'current', data });
                 if (error) throw error;
             } else if (Array.isArray(data)) {
-                // Optimized Update: Delete missing, then UPSERT
+                // Optimized Update: UPSERT ONLY
+                // We no longer delete missing items here to prevent race conditions across serverless instances.
+                // Concurrent lambdas reading an array and writing back missing elements used to wipe out new inserts.
                 const payload = data.map(item => {
                     const id = item.id ? String(item.id) : crypto.randomUUID();
                     const { id: _, ...cleanItem } = item;
                     return { id, data: cleanItem };
                 });
                 
-                const currentIds = payload.map(p => p.id);
-                if (currentIds.length > 0) {
-                    // Delete items that are no longer in the payload
-                    await supabase.from(collectionName).delete().not('id', 'in', `(${currentIds.join(',')})`);
-                    
+                if (payload.length > 0) {
                     const { error } = await supabase.from(collectionName).upsert(payload);
                     if (error) throw error;
-                } else {
-                    // Payload is empty, delete everything
-                    await supabase.from(collectionName).delete().neq('id', 'dummy_id_to_clear_table');
                 }
             }
             
@@ -110,5 +105,50 @@ export async function writeDB(filename: string, data: any) {
     });
     writeLocks[filename] = next.catch(() => { });
     return next;
+}
+
+export async function deleteDB(filename: string, id: string) {
+    const collectionName = filename.replace('.json', '');
+    if (USE_CLOUD_DB) {
+        try {
+            const { error } = await supabase.from(collectionName).delete().eq('id', id);
+            if (error) throw error;
+            if (cache[filename] && Array.isArray(cache[filename].data)) {
+                cache[filename].data = cache[filename].data.filter((i: any) => i.id !== id);
+            }
+        } catch (error) {
+            console.error(`Supabase Delete Error [${collectionName}]:`, error);
+            throw error;
+        }
+    } else {
+        const data = await readDB(filename);
+        if (Array.isArray(data)) {
+            const filtered = data.filter((i: any) => i.id !== id);
+            await writeDB(filename, filtered);
+        }
+    }
+}
+
+export async function deleteManyDB(filename: string, ids: string[]) {
+    if (ids.length === 0) return;
+    const collectionName = filename.replace('.json', '');
+    if (USE_CLOUD_DB) {
+        try {
+            const { error } = await supabase.from(collectionName).delete().in('id', ids);
+            if (error) throw error;
+            if (cache[filename] && Array.isArray(cache[filename].data)) {
+                cache[filename].data = cache[filename].data.filter((i: any) => !ids.includes(i.id));
+            }
+        } catch (error) {
+            console.error(`Supabase DeleteMany Error [${collectionName}]:`, error);
+            throw error;
+        }
+    } else {
+        const data = await readDB(filename);
+        if (Array.isArray(data)) {
+            const filtered = data.filter((i: any) => !ids.includes(i.id));
+            await writeDB(filename, filtered);
+        }
+    }
 }
 

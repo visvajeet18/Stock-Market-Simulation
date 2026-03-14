@@ -15,6 +15,31 @@
   --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.2);
 }
 
+.light-theme {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --secondary: #ffffff;
+  --accent: #7c3aed;
+  --success: #059669;
+  --danger: #dc2626;
+  --border: #e2e8f0;
+  --glass: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 20px rgba(37, 99, 235, 0.1);
+}
+
+.stock-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: contain;
+  background: white;
+  padding: 2px;
+  border: 1px solid var(--border);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;

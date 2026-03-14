@@ -34,6 +34,9 @@ export default function Dashboard() {
     const [selectedChartStock, setSelectedChartStock] = useState('^BSESN');
     const [analystStock, setAnalystStock] = useState<any>(null);
     const [showNews, setShowNews] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+    const [isMobile, setIsMobile] = useState(false);
 
     // Advanced Orders & History State
     const [orders, setOrders] = useState<any[]>([]);
@@ -53,6 +56,16 @@ export default function Dashboard() {
     const router = useRouter();
 
     useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth < 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+
+        const storedTheme = localStorage.getItem('theme') as 'dark' | 'light';
+        if (storedTheme) {
+            setTheme(storedTheme);
+            document.body.classList.toggle('light-theme', storedTheme === 'light');
+        }
+
         const storedUser = localStorage.getItem('user');
         if (!storedUser) { router.push('/login'); return; }
         const parsedUser = JSON.parse(storedUser);
@@ -182,11 +195,11 @@ export default function Dashboard() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Trade failed');
 
-            // Trigger Gamification Confetti/Rekt if P&L is substantial (> ₹2500)
-            if (pnl > 2500) {
+            // Trigger Gamification Confetti/Rekt for ANY P&L
+            if (pnl > 0) {
                 setTradeEffect({ type: 'win', amount: pnl });
                 setTimeout(() => setTradeEffect(null), 3500);
-            } else if (pnl < -2500) {
+            } else if (pnl < 0) {
                 setTradeEffect({ type: 'lose', amount: Math.abs(pnl) });
                 setTimeout(() => setTradeEffect(null), 3500);
             }
@@ -284,6 +297,16 @@ export default function Dashboard() {
             return total + qty * (stock?.price || 0);
         }, 0);
     }, [user, stocks]);
+
+    const filteredStocks = useMemo(() => {
+        return (stocks || [])
+            .filter(s => 
+                s.symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (s.sector || '').toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .sort((a, b) => a.symbol.localeCompare(b.symbol));
+    }, [stocks, searchTerm]);
 
     const activeInvestments = loans
         .filter(l => l.lenderId === user?.id && l.status === 'ACTIVE')
@@ -406,6 +429,14 @@ export default function Dashboard() {
                     <span style={{ color: user.suspended ? '#ef4444' : '#e2e8f0', marginRight: '1rem', fontWeight: user.suspended ? 800 : 400 }}>
                         {user.name} {user.suspended && '(SUSPENDED)'}
                     </span>
+                    <button className="nav-btn" onClick={() => { 
+                        const newTheme = theme === 'dark' ? 'light' : 'dark';
+                        setTheme(newTheme);
+                        localStorage.setItem('theme', newTheme);
+                        document.body.classList.toggle('light-theme', newTheme === 'light');
+                    }} style={{ background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: '1.2rem', padding: '0.4rem' }}>
+                        {theme === 'dark' ? '🌙' : '☀️'}
+                    </button>
                     <button className="nav-btn" onClick={() => { localStorage.removeItem('user'); router.push('/'); }}>Logout</button>
                 </div>
             </nav>
@@ -609,7 +640,7 @@ export default function Dashboard() {
                                         <select required value={tradeForm.symbol} onChange={e => setTradeForm({ ...tradeForm, symbol: e.target.value })}
                                             style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(15,23,42,0.6)', border: '1px solid var(--border)', color: 'white', outline: 'none' }}>
                                             <option value="" disabled>Select Stock</option>
-                                            {stocks.map(s => <option key={s.symbol} value={s.symbol}>{s.symbol} — ₹{s.price?.toFixed(2)}</option>)}
+                                            {filteredStocks.map(s => <option key={s.symbol} value={s.symbol}>{s.symbol} — ₹{s.price?.toFixed(2)}</option>)}
                                         </select>
                                     </div>
                                 </div>
@@ -668,7 +699,7 @@ export default function Dashboard() {
                                         <select required value={orderForm.symbol} onChange={e => setOrderForm({ ...orderForm, symbol: e.target.value })}
                                             style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(15,23,42,0.6)', border: '1px solid var(--border)', color: 'white', outline: 'none' }}>
                                             <option value="" disabled>Select Stock</option>
-                                            {stocks.map(s => <option key={s.symbol} value={s.symbol}>{s.symbol} — ₹{s.price?.toFixed(2)}</option>)}
+                                            {filteredStocks.map(s => <option key={s.symbol} value={s.symbol}>{s.symbol} — ₹{s.price?.toFixed(2)}</option>)}
                                         </select>
                                     </div>
                                 </div>
@@ -718,9 +749,12 @@ export default function Dashboard() {
                                         return (
                                             <div key={sym} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', background: 'rgba(15,23,42,0.4)', borderRadius: '8px', border: '1px solid var(--border)', cursor: 'pointer' }}
                                                 onClick={() => { const st = stocks.find(s => s.symbol === sym); if (st) setAnalystStock(st); }}>
-                                                <div>
-                                                    <div style={{ fontWeight: 600 }}>{sym}</div>
-                                                    <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{qty} shares • Avg ₹{avgCost.toFixed(2)}</div>
+                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                                    {stock?.logoUrl && <img src={stock.logoUrl} className="stock-logo" alt="" onError={(e: any) => e.target.style.display = 'none'} />}
+                                                    <div>
+                                                        <div style={{ fontWeight: 600 }}>{sym}</div>
+                                                        <div style={{ fontSize: '0.7rem', color: '#94a3b8' }}>{qty} shares • Avg ₹{avgCost.toFixed(2)}</div>
+                                                    </div>
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <div style={{ fontWeight: 600 }}>₹{value.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
@@ -811,12 +845,24 @@ export default function Dashboard() {
 
                 {/* ── Live Market Grid ── */}
                 <div className="card" style={{ marginTop: '2rem' }}>
-                    <div className="card-header">
-                        Live Market
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>Click any stock for full analysis →</span>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span>Live Market</span>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 400 }}>Click any stock for full analysis →</span>
+                        </div>
+                        <div style={{ background: 'rgba(15,23,42,0.6)', border: '1px solid var(--border)', borderRadius: '8px', padding: '0.25rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: isMobile ? '100%' : '250px' }}>
+                            <span style={{ fontSize: '0.9rem' }}>🔍</span>
+                            <input 
+                                type="text" 
+                                placeholder="Search Symbol, Name..." 
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                style={{ background: 'transparent', border: 'none', color: 'white', padding: '0.4rem', outline: 'none', fontSize: '0.85rem', width: '100%' }}
+                            />
+                        </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
-                        {stocks.map(stock => {
+                        {filteredStocks.map(stock => {
                             const prev = stock.previousPrice || stock.price;
                             const diff = stock.price - prev;
                             const pct = prev !== 0 ? (diff / prev) * 100 : 0;
@@ -829,10 +875,13 @@ export default function Dashboard() {
                                     onClick={() => { setSelectedChartStock(stock.symbol); setAnalystStock(stock); setTradeForm({ ...tradeForm, symbol: stock.symbol }); scrollToTrade(); }}
                                     style={{ cursor: 'pointer', padding: '1rem', border: `1px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`, borderRadius: '8px', background: isSelected ? 'rgba(59,130,246,0.1)' : 'rgba(15,23,42,0.4)', transition: 'all 0.2s ease' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div>
-                                            <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{stock.symbol}</div>
-                                            <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{stock.name}</div>
-                                            {stock.sector && <div style={{ fontSize: '0.65rem', color: '#c084fc', marginTop: '0.15rem' }}>{stock.sector}</div>}
+                                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                            {stock.logoUrl && <img src={stock.logoUrl} className="stock-logo" alt="" onError={(e: any) => e.target.style.display = 'none'} />}
+                                            <div>
+                                                <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{stock.symbol}</div>
+                                                <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>{stock.name}</div>
+                                                {stock.sector && <div style={{ fontSize: '0.65rem', color: '#c084fc', marginTop: '0.15rem' }}>{stock.sector}</div>}
+                                            </div>
                                         </div>
                                         <div style={{ textAlign: 'right' }}>
                                             <div style={{ fontWeight: 700, fontSize: '1.1rem', color }}> ₹{stock.price.toFixed(2)}</div>

@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
-import { readDB, writeDB } from '@/lib/db';
+import { readDB, writeDB, deleteDB, deleteManyDB } from '@/lib/db';
 
 export async function POST(request: Request) {
     try {
@@ -16,22 +16,17 @@ export async function POST(request: Request) {
         }
 
         // Delete User
-        const users = await readDB('users.json');
-        const updatedUsers = users.filter((u: any) => u.id !== userIdToDelete);
-
-        if (users.length === updatedUsers.length) {
-            return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        }
-        await writeDB('users.json', updatedUsers);
+        await deleteDB('users.json', userIdToDelete);
 
         // Filter Out User's Transactions to clean up database
         const transactions = await readDB('transactions.json');
-        const updatedTransactions = transactions.filter((t: any) => t.userId !== userIdToDelete);
-        await writeDB('transactions.json', updatedTransactions);
+        const userTxIds = transactions.filter((t: any) => t.userId === userIdToDelete).map((t: any) => String(t.id));
+        if (userTxIds.length > 0) {
+            await deleteManyDB('transactions.json', userTxIds);
+        }
 
         return NextResponse.json({ success: true, message: 'User deleted successfully' });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
-

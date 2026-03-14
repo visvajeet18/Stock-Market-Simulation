@@ -31,7 +31,9 @@ export default function AdminDashboard() {
 
     // Admin Control Forms State
     const [corpActionForm, setCorpActionForm] = useState({ symbol: '', action: 'DIVIDEND', amount: '' });
-    const [ipoForm, setIpoForm] = useState({ symbol: '', name: '', sector: '', initialPrice: '', shares: '' });
+    const [ipoForm, setIpoForm] = useState({ symbol: '', name: '', sector: '', initialPrice: '', shares: '', logoUrl: '' });
+    const [searchTerm, setSearchTerm] = useState('');
+    const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
     // Security 
     const [anomalies, setAnomalies] = useState<any[]>([]);
@@ -40,6 +42,12 @@ export default function AdminDashboard() {
     const router = useRouter();
 
     useEffect(() => {
+        const storedTheme = localStorage.getItem('theme') as 'dark' | 'light';
+        if (storedTheme) {
+            setTheme(storedTheme);
+            document.body.classList.toggle('light-theme', storedTheme === 'light');
+        }
+
         const storedUser = localStorage.getItem('user');
         if (!storedUser) { router.push('/login?admin=true'); return; }
         const parsedUser = JSON.parse(storedUser);
@@ -221,7 +229,9 @@ export default function AdminDashboard() {
                 symbol: ipoForm.symbol,
                 name: ipoForm.name,
                 sector: ipoForm.sector,
-                initialPrice: Number(ipoForm.initialPrice)
+                initialPrice: Number(ipoForm.initialPrice),
+                shares: Number(ipoForm.shares),
+                logoUrl: ipoForm.logoUrl
             }),
         });
 
@@ -247,6 +257,17 @@ export default function AdminDashboard() {
     const totalMarketCap = Object.values(stats.defaultStockPrices as Record<string, number>).reduce((a, b) => a + b, 0);
     const totalTrades = stats.recentTransactions.length;
     const highRiskCount = risk.filter((r: any) => r.riskLevel === 'HIGH').length;
+
+    const filteredStocks = useMemo(() => {
+        if (!stats.defaultStockPrices) return [];
+        return Object.keys(stats.defaultStockPrices)
+            .filter(symbol => 
+                symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (stats.stockMeta?.[symbol]?.sector || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (stats.stockMeta?.[symbol]?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .sort((a, b) => a.localeCompare(b));
+    }, [stats.defaultStockPrices, stats.stockMeta, searchTerm]);
 
     const TABS: { id: Tab; label: string; icon: string }[] = [
         { id: 'overview', label: 'Overview', icon: '📊' },
@@ -282,6 +303,14 @@ export default function AdminDashboard() {
                     <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Administrator</span>
                     <button className="nav-btn" onClick={triggerManualTick} style={{ background: 'var(--accent)', color: '#0f172a' }} disabled={loading}>
                         {loading ? '⏳ Updating...' : '⚡ Force Market Tick'}
+                    </button>
+                    <button className="nav-btn" onClick={() => { 
+                        const newTheme = theme === 'dark' ? 'light' : 'dark';
+                        setTheme(newTheme);
+                        localStorage.setItem('theme', newTheme);
+                        document.body.classList.toggle('light-theme', newTheme === 'light');
+                    }} style={{ background: 'transparent', border: '1px solid var(--accent)', color: 'var(--accent)', fontSize: '1.2rem', padding: '0.4rem' }}>
+                        {theme === 'dark' ? '🌙' : '☀️'}
                     </button>
                     <button className="nav-btn" onClick={() => { localStorage.removeItem('user'); router.push('/'); }}>Logout</button>
                 </div>
@@ -399,6 +428,19 @@ export default function AdminDashboard() {
                 {/* ══════════════════ LIVE MARKET TAB ══════════════════ */}
                 {tab === 'market' && (
                     <>
+                        <div className="card" style={{ marginBottom: '1.5rem', background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                <span style={{ fontSize: '1.2rem' }}>🔍</span>
+                                <input 
+                                    type="text" 
+                                    placeholder="Search by Symbol, Name or Sector..." 
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    style={{ flex: 1, background: 'transparent', border: 'none', color: 'white', padding: '0.5rem', outline: 'none', fontSize: '1rem' }}
+                                />
+                                {searchTerm && <button onClick={() => setSearchTerm('')} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>✕</button>}
+                            </div>
+                        </div>
                         <div className="grid-2" style={{ marginBottom: '2rem' }}>
                             {/* Chart */}
                             <div className="card">
@@ -428,7 +470,7 @@ export default function AdminDashboard() {
                             <div className="card">
                                 <div className="card-header">⚡ Live Fluctuations <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400 }}>(GBM · 2s tick)</span></div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', maxHeight: '380px', overflowY: 'auto' }}>
-                                    {Object.keys(stats.defaultStockPrices).map(symbol => {
+                                    {filteredStocks.map(symbol => {
                                         const history = stats.historicalData?.[symbol] || [];
                                         const cur = history.length > 0 ? history[history.length - 1] : stats.defaultStockPrices[symbol];
                                         const prv = history.length > 1 ? history[history.length - 2] : cur;
@@ -439,9 +481,12 @@ export default function AdminDashboard() {
                                         return (
                                             <div key={symbol} onClick={() => setSelectedChartStock(symbol)}
                                                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.75rem', background: selectedChartStock === symbol ? 'rgba(59,130,246,0.1)' : 'rgba(15,23,42,0.4)', borderRadius: '8px', border: flashMap[symbol] ? `1px solid ${flashMap[symbol] === 'up' ? 'var(--success)' : 'var(--danger)'}` : '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.2s' }}>
-                                                <div>
-                                                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{symbol}</div>
-                                                    <div style={{ fontSize: '0.65rem', color: '#64748b' }}>{meta.sector}</div>
+                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                                    {meta.logoUrl && <img src={meta.logoUrl} className="stock-logo" alt="" onError={(e: any) => e.target.style.display = 'none'} />}
+                                                    <div>
+                                                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{symbol}</div>
+                                                        <div style={{ fontSize: '0.65rem', color: '#64748b' }}>{meta.sector}</div>
+                                                    </div>
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <div className={flashMap[symbol] === 'up' ? 'price-flash-up' : flashMap[symbol] === 'down' ? 'price-flash-down' : ''} style={{ fontFamily: 'monospace', fontWeight: 700 }}>
@@ -462,16 +507,19 @@ export default function AdminDashboard() {
                         <div className="card">
                             <div className="card-header">🎛️ Market Control Center</div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
-                                {Object.keys(stats.defaultStockPrices).map(symbol => {
+                                {filteredStocks.map(symbol => {
                                     const meta = stats.stockMeta?.[symbol] ?? {};
                                     const isAuto = stats.stockAutoUpdates[symbol] !== false;
                                     const halted = stats.marketState?.haltedStocks?.includes(symbol);
                                     return (
                                         <div key={symbol} style={{ padding: '1rem', background: 'rgba(15,23,42,0.5)', borderRadius: '10px', border: halted ? '1px solid #f59e0b' : '1px solid var(--border)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                                                <div>
-                                                    <div style={{ fontWeight: 700 }}>{symbol}</div>
-                                                    <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{meta.sector}</div>
+                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                                    {meta.logoUrl && <img src={meta.logoUrl} className="stock-logo" alt="" onError={(e: any) => e.target.style.display = 'none'} />}
+                                                    <div>
+                                                        <div style={{ fontWeight: 700 }}>{symbol}</div>
+                                                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{meta.sector}</div>
+                                                    </div>
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
                                                     <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>₹{stats.defaultStockPrices[symbol].toFixed(2)}</div>
@@ -595,6 +643,10 @@ export default function AdminDashboard() {
                                     <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
                                         <label>Total Shares</label>
                                         <input type="number" min="1" required step="1" placeholder="e.g. 10000" value={ipoForm.shares} onChange={e => setIpoForm({ ...ipoForm, shares: e.target.value })} />
+                                    </div>
+                                    <div className="input-group" style={{ flex: 1, marginBottom: 0 }}>
+                                        <label>Logo URL (optional)</label>
+                                        <input type="text" placeholder="https://..." value={ipoForm.logoUrl} onChange={e => setIpoForm({ ...ipoForm, logoUrl: e.target.value })} />
                                     </div>
                                 </div>
 
