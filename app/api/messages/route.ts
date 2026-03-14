@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     try {
         const messages = await readDB('messages.json');
         // Return messages for this user
-        const userMessages = messages.filter((m: any) => m.targetUserId === userId);
+        const userMessages = messages.filter((m: any) => String(m.targetUserId) === String(userId));
         return NextResponse.json(userMessages);
     } catch {
         return NextResponse.json([]);

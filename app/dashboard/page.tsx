@@ -103,7 +103,13 @@ export default function Dashboard() {
                 if (data.length > 0) {
                     const latest = data[data.length - 1];
                     if (latest.id !== lastMsgIdRef.current) {
-                        if (hasInitializedRef.current && lastMsgIdRef.current !== null) {
+                        // Alert logic:
+                        // 1. If not the first fetch (lastMsgIdRef.current !== null)
+                        // 2. OR if it's the first fetch but the message is BRAND NEW (within last 2 mins)
+                        const msgTime = new Date(latest.timestamp).getTime();
+                        const isBrandNew = (Date.now() - msgTime) < 120000;
+
+                        if (lastMsgIdRef.current !== null || isBrandNew) {
                             playSound('message');
                             alert(`📬 NEW PRIVATE MESSAGE:\n\n${latest.message}`);
                         }
@@ -912,9 +918,12 @@ export default function Dashboard() {
                                     )}
                                 {/* Admin Messages Inbox */}
                                 <div>
-                                    <h4 style={{ fontSize: '0.85rem', color: '#c084fc', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                        📫 Messages from Admin
-                                        {privateMessages.length > 0 && <span style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>{privateMessages.length}</span>}
+                                    <h4 style={{ fontSize: '0.85rem', color: '#c084fc', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'space-between' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            📫 Messages from Admin
+                                            {privateMessages.length > 0 && <span style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>{privateMessages.length}</span>}
+                                        </span>
+                                        {user && <span style={{ fontSize: '0.6rem', color: '#4b5563', fontWeight: 400 }}>ID: {user.id}</span>}
                                     </h4>
                                     {privateMessages.length === 0 ? (
                                         <div style={{ color: '#64748b', fontSize: '0.8rem', padding: '1rem', background: 'rgba(15,23,42,0.4)', borderRadius: '8px', textAlign: 'center' }}>
