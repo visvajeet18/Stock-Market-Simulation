@@ -89,6 +89,7 @@ export default function Dashboard() {
         fetchOrders(parsedUser.id);
         fetchPrivateMessages(parsedUser.id);
         
+        hasInitializedRef.current = true;
         return () => clearInterval(interval);
     }, [router]);
 
@@ -100,7 +101,7 @@ export default function Dashboard() {
                 if (data.length > 0) {
                     const latest = data[data.length - 1];
                     if (latest.id !== lastMsgIdRef.current) {
-                        if (lastMsgIdRef.current !== null) {
+                        if (hasInitializedRef.current && lastMsgIdRef.current !== null) {
                             playSound('message');
                             alert(`📬 NEW PRIVATE MESSAGE:\n\n${latest.message}`);
                         }
@@ -117,8 +118,8 @@ export default function Dashboard() {
             if (res.ok) {
                 const data = await res.json();
                 setAnnouncements(data);
-                if (data.length > lastAnnCountRef.current) {
-                    if (lastAnnCountRef.current > 0) playSound('announcement');
+                if (hasInitializedRef.current && data.length > lastAnnCountRef.current) {
+                    playSound('announcement');
                 }
                 lastAnnCountRef.current = data.length;
             }
@@ -138,9 +139,12 @@ export default function Dashboard() {
 
                 // Global Siren Trigger
                 if (data.sirenTrigger && data.sirenTrigger > lastSirenRef.current) {
-                    if (lastSirenRef.current !== 0) playSound('siren');
-                    lastSirenRef.current = data.sirenTrigger;
-                } else if (!lastSirenRef.current && data.sirenTrigger) {
+                    // If lastSirenRef.current is 0, it's the first fetch. 
+                    // Only play if the trigger is recent (within last 30s) to avoid playing old sirens on login
+                    const isRecent = (Date.now() - data.sirenTrigger) < 30000;
+                    if (lastSirenRef.current > 0 || isRecent) {
+                        playSound('siren');
+                    }
                     lastSirenRef.current = data.sirenTrigger;
                 }
             }
@@ -205,6 +209,7 @@ export default function Dashboard() {
     const lastSirenRef = useRef<number>(0);
     const lastAnnCountRef = useRef<number>(0);
     const lastMsgIdRef = useRef<string | null>(null);
+    const hasInitializedRef = useRef(false);
 
     // Audio Helper
     const playSound = (type: 'buy' | 'profit' | 'loss' | 'coins' | 'siren' | 'announcement' | 'message') => {

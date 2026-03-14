@@ -10,7 +10,8 @@ export async function GET() {
         return NextResponse.json({
             sentiment: state?.sentiment ?? 'normal',
             haltedStocks: state?.haltedStocks ?? [],
-            lastEvent: state?.lastEvent ?? null
+            lastEvent: state?.lastEvent ?? null,
+            sirenTrigger: state?.sirenTrigger ?? 0
         });
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 });
