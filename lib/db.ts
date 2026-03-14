@@ -12,7 +12,7 @@ const USE_CLOUD_DB = process.env.USE_FIRESTORE === 'true' || process.env.NODE_EN
 
 // ─── Simple In-Memory Cache ──────────────────────────────────────────────────
 const cache: Record<string, { data: any; expires: number }> = {};
-const CACHE_TTL = 2000; // 2 seconds cache for reads
+const CACHE_TTL = 0; // Disable memory cache for Supabase to avoid stale data across Lambdas
 
 export async function readDB(filename: string) {
     const collectionName = filename.replace('.json', '');
