@@ -308,6 +308,11 @@ export default function Dashboard() {
             .sort((a, b) => a.symbol.localeCompare(b.symbol));
     }, [stocks, searchTerm]);
 
+    const stocks_list = stocks || [];
+    const loans_list = loans || [];
+    const orders_list = orders || [];
+    const history_list = history || [];
+
     const activeInvestments = loans
         .filter(l => l.lenderId === user?.id && l.status === 'ACTIVE')
         .reduce((sum, l) => sum + l.amount * (1 + l.interestRate / 100), 0);

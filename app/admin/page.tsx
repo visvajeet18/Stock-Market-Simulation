@@ -246,28 +246,29 @@ export default function AdminDashboard() {
     };
 
     if (loading || !stats) return <div className="auth-container"><h2 className="title-glow">Loading Admin Portal...</h2></div>;
-    if (!stats.leaderboard) stats.leaderboard = [];
-    if (!stats.recentTransactions) stats.recentTransactions = [];
-    if (!stats.defaultStockPrices) stats.defaultStockPrices = {};
-    if (!stats.loans) stats.loans = [];
-    if (!stats.stockAutoUpdates) stats.stockAutoUpdates = {};
+
+    const stats_leaderboard = stats.leaderboard || [];
+    const stats_recentTransactions = stats.recentTransactions || [];
+    const stats_defaultStockPrices = stats.defaultStockPrices || {};
+    const stats_loans = stats.loans || [];
+    const stats_stockAutoUpdates = stats.stockAutoUpdates || {};
 
     const sentiment: string = stats.marketState?.sentiment ?? 'normal';
     const sentCfg = SENTIMENT_CONFIG[sentiment] ?? SENTIMENT_CONFIG.normal;
-    const totalMarketCap = Object.values(stats.defaultStockPrices as Record<string, number>).reduce((a, b) => a + b, 0);
-    const totalTrades = stats.recentTransactions.length;
+    const totalMarketCap = Object.values(stats_defaultStockPrices as Record<string, number>).reduce((a, b) => a + b, 0);
+    const totalTrades = stats_recentTransactions.length;
     const highRiskCount = risk.filter((r: any) => r.riskLevel === 'HIGH').length;
 
     const filteredStocks = useMemo(() => {
-        if (!stats.defaultStockPrices) return [];
-        return Object.keys(stats.defaultStockPrices)
+        if (!stats_defaultStockPrices) return [];
+        return Object.keys(stats_defaultStockPrices)
             .filter(symbol => 
                 symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
                 (stats.stockMeta?.[symbol]?.sector || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                 (stats.stockMeta?.[symbol]?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
             )
             .sort((a, b) => a.localeCompare(b));
-    }, [stats.defaultStockPrices, stats.stockMeta, searchTerm]);
+    }, [stats_defaultStockPrices, stats.stockMeta, searchTerm]);
 
     const TABS: { id: Tab; label: string; icon: string }[] = [
         { id: 'overview', label: 'Overview', icon: '📊' },
@@ -346,9 +347,9 @@ export default function AdminDashboard() {
                         {/* Stat cards */}
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
                             {[
-                                { label: 'Total Students', value: stats.leaderboard.length, icon: '🎓', color: '#3b82f6' },
+                                { label: 'Total Students', value: stats_leaderboard.length, icon: '🎓', color: '#3b82f6' },
                                 { label: 'Total Trades', value: totalTrades, icon: '🔄', color: '#10b981' },
-                                { label: 'Active Loans', value: stats.loans.filter((l: any) => l.status === 'ACTIVE').length, icon: '💰', color: '#f59e0b' },
+                                { label: 'Active Loans', value: stats_loans.filter((l: any) => l.status === 'ACTIVE').length, icon: '💰', color: '#f59e0b' },
                                 { label: 'High-Risk Students', value: highRiskCount, icon: '⚠️', color: '#ef4444' },
                                 { label: 'Market Sentiment', value: sentiment.toUpperCase(), icon: '📡', color: sentCfg.color },
                                 { label: 'Pending Announcements', value: announcements.length, icon: '📢', color: '#8b5cf6' },
@@ -371,7 +372,7 @@ export default function AdminDashboard() {
                                             <tr><th>Rank</th><th>Student</th><th>Wealth</th><th>P&L</th><th>Holdings</th></tr>
                                         </thead>
                                         <tbody>
-                                            {stats.leaderboard.map((s: any, i: number) => (
+                                            {stats_leaderboard.map((s: any, i: number) => (
                                                 <tr key={s.id} className="table-row-hover" style={{ cursor: 'pointer' }} onClick={() => { setSelectedUserForActivity(s); setTab('activity'); }}>
                                                     <td style={{ fontWeight: 700, color: i === 0 ? '#fbbf24' : i === 1 ? '#e2e8f0' : i === 2 ? '#cd7f32' : 'inherit' }}>
                                                         #{i + 1} {i === 0 && '🏆'}
@@ -472,7 +473,7 @@ export default function AdminDashboard() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem', maxHeight: '380px', overflowY: 'auto' }}>
                                     {filteredStocks.map(symbol => {
                                         const history = stats.historicalData?.[symbol] || [];
-                                        const cur = history.length > 0 ? history[history.length - 1] : stats.defaultStockPrices[symbol];
+                                        const cur = history.length > 0 ? history[history.length - 1] : stats_defaultStockPrices[symbol];
                                         const prv = history.length > 1 ? history[history.length - 2] : cur;
                                         const diff = cur - prv;
                                         const pct = prv !== 0 ? (diff / prv) * 100 : 0;
@@ -509,7 +510,7 @@ export default function AdminDashboard() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
                                 {filteredStocks.map(symbol => {
                                     const meta = stats.stockMeta?.[symbol] ?? {};
-                                    const isAuto = stats.stockAutoUpdates[symbol] !== false;
+                                    const isAuto = stats_stockAutoUpdates[symbol] !== false;
                                     const halted = stats.marketState?.haltedStocks?.includes(symbol);
                                     return (
                                         <div key={symbol} style={{ padding: '1rem', background: 'rgba(15,23,42,0.5)', borderRadius: '10px', border: halted ? '1px solid #f59e0b' : '1px solid var(--border)' }}>
@@ -522,7 +523,7 @@ export default function AdminDashboard() {
                                                     </div>
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
-                                                    <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>₹{stats.defaultStockPrices[symbol].toFixed(2)}</div>
+                                                    <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>₹{stats_defaultStockPrices[symbol].toFixed(2)}</div>
                                                     {halted && <span style={{ fontSize: '0.65rem', color: '#f59e0b' }}>⏸ HALTED</span>}
                                                 </div>
                                             </div>
@@ -593,8 +594,8 @@ export default function AdminDashboard() {
                                     <select required value={corpActionForm.symbol} onChange={e => setCorpActionForm({ ...corpActionForm, symbol: e.target.value })}
                                         style={{ width: '100%', padding: '0.75rem 1rem', borderRadius: '8px', background: 'rgba(15,23,42,0.6)', border: '1px solid var(--border)', color: 'white', outline: 'none' }}>
                                         <option value="" disabled>Select Stock</option>
-                                        {Object.keys(stats.defaultStockPrices).map(sym => (
-                                            <option key={sym} value={sym}>{sym} — ₹{stats.defaultStockPrices[sym].toFixed(2)}</option>
+                                        {Object.keys(stats_defaultStockPrices).map(sym => (
+                                            <option key={sym} value={sym}>{sym} — ₹{stats_defaultStockPrices[sym].toFixed(2)}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -726,7 +727,7 @@ export default function AdminDashboard() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {stats.leaderboard.map((s: any, i: number) => (
+                                    {stats_leaderboard.map((s: any, i: number) => (
                                         <tr key={s.id} className="table-row-hover">
                                             <td style={{ fontWeight: 700, color: i === 0 ? '#fbbf24' : i === 1 ? '#e2e8f0' : i === 2 ? '#cd7f32' : 'inherit' }}>#{i + 1}</td>
                                             <td>
@@ -842,8 +843,8 @@ export default function AdminDashboard() {
                         <div className="card">
                             <div className="card-header">🔄 Global Activity Feed</div>
                             <div style={{ maxHeight: '600px', overflowY: 'auto', marginTop: '1rem' }}>
-                                {stats.recentTransactions.length === 0 ? <p style={{ color: '#64748b' }}>No trades yet.</p> : stats.recentTransactions.map((tx: any, idx: number) => {
-                                    const student = stats.leaderboard.find((u: any) => u.id === tx.userId);
+                                {stats_recentTransactions.length === 0 ? <p style={{ color: '#64748b' }}>No trades yet.</p> : stats_recentTransactions.map((tx: any, idx: number) => {
+                                    const student = stats_leaderboard.find((u: any) => u.id === tx.userId);
                                     return (
                                         <div key={idx} style={{ padding: '0.75rem 0', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <div>
@@ -869,13 +870,13 @@ export default function AdminDashboard() {
                                 <select
                                     value={selectedUserForActivity?.id || ''}
                                     onChange={(e) => {
-                                        const user = stats.leaderboard.find((u: any) => u.id === e.target.value);
+                                        const user = stats_leaderboard.find((u: any) => u.id === e.target.value);
                                         setSelectedUserForActivity(user || null);
                                     }}
                                     style={{ padding: '0.3rem', fontSize: '0.8rem', background: 'rgba(15,23,42,0.8)', color: 'white', border: '1px solid var(--border)', borderRadius: '4px' }}
                                 >
                                     <option value="">-- Select a Student --</option>
-                                    {stats.leaderboard.map((u: any) => (
+                                    {stats_leaderboard.map((u: any) => (
                                         <option key={u.id} value={u.id}>{u.name} (@{u.username})</option>
                                     ))}
                                 </select>
@@ -895,9 +896,9 @@ export default function AdminDashboard() {
                                             </span>
                                         </div>
                                     </div>
-                                    {stats.recentTransactions.filter((tx: any) => tx.userId === selectedUserForActivity.id).length === 0 ? (
+                                    {stats_recentTransactions.filter((tx: any) => tx.userId === selectedUserForActivity.id).length === 0 ? (
                                         <p style={{ color: '#64748b' }}>No trades recorded.</p>
-                                    ) : stats.recentTransactions.filter((tx: any) => tx.userId === selectedUserForActivity.id).map((tx: any, idx: number) => (
+                                    ) : stats_recentTransactions.filter((tx: any) => tx.userId === selectedUserForActivity.id).map((tx: any, idx: number) => (
                                         <div key={idx} style={{ padding: '0.75rem', marginBottom: '0.5rem', background: 'rgba(15,23,42,0.4)', borderRadius: '8px', border: '1px solid var(--border)' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                                 <span>
