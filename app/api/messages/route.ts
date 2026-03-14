@@ -9,10 +9,9 @@ export async function GET(request: Request) {
     if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
 
     try {
-        const messages = await readDB('messages.json');
-        // Return messages for this user
-        const userMessages = messages.filter((m: any) => String(m.targetUserId) === String(userId));
-        return NextResponse.json(userMessages);
+        const users = await readDB('users.json');
+        const user = users.find((u: any) => String(u.id) === String(userId));
+        return NextResponse.json(user?.privateMessages || []);
     } catch {
         return NextResponse.json([]);
     }
@@ -26,22 +25,27 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
         }
 
-        let messages = [];
-        try { messages = await readDB('messages.json'); } catch { messages = []; }
+        const users = await readDB('users.json');
+        const userIndex = users.findIndex((u: any) => String(u.id) === String(targetUserId));
+        
+        if (userIndex === -1) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
+        }
 
         const newMessage = {
             id: Date.now().toString(),
-            targetUserId,
             message,
             timestamp: new Date().toISOString(),
             read: false
         };
 
-        messages.push(newMessage);
-        // Keep last 200 messages
-        if (messages.length > 200) messages.shift();
+        if (!users[userIndex].privateMessages) users[userIndex].privateMessages = [];
+        users[userIndex].privateMessages.push(newMessage);
         
-        await writeDB('messages.json', messages);
+        // Keep last 50 messages per user to avoid bloat
+        if (users[userIndex].privateMessages.length > 50) users[userIndex].privateMessages.shift();
+        
+        await writeDB('users.json', users);
 
         return NextResponse.json({ success: true });
     } catch (error: any) {

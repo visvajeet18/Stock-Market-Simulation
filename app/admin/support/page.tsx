@@ -60,11 +60,16 @@ export default function AdminSupport() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ adminId: 'admin-001', targetUserId: selectedStudent, message: privateMsg })
             });
+            const data = await res.json();
             if (res.ok) {
                 alert('✓ Private message sent!');
                 setPrivateMsg('');
+            } else {
+                alert(`❌ Failed: ${data.error || 'Server error'}`);
             }
-        } catch (err) { alert('Failed to send message'); }
+        } catch (err: any) { 
+            alert(`❌ Network error: ${err.message}`); 
+        }
         setSending(false);
     };
 
