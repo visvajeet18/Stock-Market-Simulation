@@ -42,6 +42,8 @@ export async function readDB(filename: string) {
             return result;
         } catch (error) {
             console.error(`Supabase Read Error [${collectionName}]:`, error);
+            // Fallback to cache if available
+            if (cache[filename]) return cache[filename].data;
             return filename === 'market_state.json' ? {} : [];
         }
     }
@@ -69,17 +71,28 @@ export async function writeDB(filename: string, data: any) {
                 const { error } = await supabase.from(collectionName).upsert({ id: 'current', data });
                 if (error) throw error;
             } else if (Array.isArray(data)) {
-                // Optimized Update: Set documents without deleting the entire collection
+                // Optimized Update: Delete missing, then UPSERT
                 const payload = data.map(item => {
                     const id = item.id ? String(item.id) : crypto.randomUUID();
                     const { id: _, ...cleanItem } = item;
                     return { id, data: cleanItem };
                 });
                 
-                const { error } = await supabase.from(collectionName).upsert(payload);
-                if (error) throw error;
+                const currentIds = payload.map(p => p.id);
+                if (currentIds.length > 0) {
+                    // Delete items that are no longer in the payload
+                    await supabase.from(collectionName).delete().not('id', 'in', `(${currentIds.join(',')})`);
+                    
+                    const { error } = await supabase.from(collectionName).upsert(payload);
+                    if (error) throw error;
+                } else {
+                    // Payload is empty, delete everything
+                    await supabase.from(collectionName).delete().neq('id', 'dummy_id_to_clear_table');
+                }
             }
             
+            // Sync cache
+            cache[filename] = { data: data, expires: Date.now() + CACHE_TTL };
             return;
         } catch (error) {
             console.error(`Supabase Write Error [${collectionName}]:`, error);

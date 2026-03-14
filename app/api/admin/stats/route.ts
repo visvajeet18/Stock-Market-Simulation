@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { readDB } from '@/lib/db';
 import { INITIAL_BALANCE } from '@/lib/constants';
@@ -81,3 +82,4 @@ export async function GET() {
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }
+

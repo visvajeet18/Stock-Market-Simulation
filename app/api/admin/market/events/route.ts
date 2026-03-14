@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic';
 import { NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db';
 import { PRESET_EVENTS } from '@/lib/marketEvents';
@@ -47,3 +48,4 @@ export async function POST(request: Request) {
 export async function GET() {
     return NextResponse.json({ events: PRESET_EVENTS });
 }
+
