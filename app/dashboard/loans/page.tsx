@@ -16,6 +16,15 @@ export default function LoansDashboard() {
 
     // For lenders responding to requests (keyed by loanId)
     const [proposeRates, setProposeRates] = useState<Record<string, string>>({});
+    const [recalling, setRecalling] = useState<string | null>(null);
+
+    const playSound = (type: 'coins') => {
+        const sounds = {
+            coins: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'
+        };
+        const audio = new Audio(sounds[type]);
+        audio.play().catch(() => console.warn('Audio play blocked or failed'));
+    };
 
     const router = useRouter();
 
@@ -149,6 +158,7 @@ export default function LoansDashboard() {
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
             fetchLoans(user.id);
+            playSound('coins');
             alert('Proposal accepted! Funds have been transferred to your account.');
         } catch (err: any) {
             alert(`Error: ${err.message}`);
@@ -196,9 +206,33 @@ export default function LoansDashboard() {
             localStorage.setItem('user', JSON.stringify(updatedUser));
 
             fetchLoans(user.id);
+            playSound('coins');
             alert('Successfully repaid the loan!');
         } catch (err: any) {
             alert(`Error: ${err.message}`);
+        }
+    };
+
+    const handleForceRecall = async (loanId: string) => {
+        if (!confirm('Recalling money instantly will cancel future interest but return the principal. Continue?')) return;
+        setRecalling(loanId);
+        try {
+            const res = await fetch('/api/loans/force-return', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lenderId: user.id, loanId })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+
+            playSound('coins');
+            alert('Loan principal recalled successfully!');
+            fetchLoans(user.id);
+            fetchUser(user.id);
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        } finally {
+            setRecalling(null);
         }
     };
 
@@ -439,13 +473,24 @@ export default function LoansDashboard() {
                                                     </p>
                                                 )}
 
-                                                {/* Lender Active/Completed */}
                                                 {(loan.status === 'ACTIVE' || loan.status === 'COMPLETED') && (
-                                                    <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between' }}>
-                                                        <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Interest Rate: {loan.interestRate}%</span>
-                                                        <span style={{ fontSize: '0.875rem', color: 'var(--success)', fontWeight: 600 }}>
-                                                            Expected Return: ₹{(loan.amount * (1 + (loan.interestRate / 100))).toFixed(2)}
-                                                        </span>
+                                                    <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <div>
+                                                            <span style={{ fontSize: '0.875rem', color: '#94a3b8' }}>Interest Rate: {loan.interestRate}%</span><br />
+                                                            <span style={{ fontSize: '0.875rem', color: 'var(--success)', fontWeight: 600 }}>
+                                                                Return: ₹{(loan.amount * (1 + (loan.interestRate / 100))).toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                        {loan.status === 'ACTIVE' && (
+                                                            <button 
+                                                                className="btn-primary" 
+                                                                style={{ padding: '0.5rem 0.8rem', fontSize: '0.75rem', background: 'var(--danger)', borderColor: 'var(--danger)' }}
+                                                                onClick={() => handleForceRecall(loan.id)}
+                                                                disabled={recalling === loan.id}
+                                                            >
+                                                                {recalling === loan.id ? 'Recalling...' : 'Force Money Back'}
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

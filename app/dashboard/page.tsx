@@ -168,6 +168,18 @@ export default function Dashboard() {
         } catch { /* silent */ }
     };
 
+    // Audio Helper
+    const playSound = (type: 'buy' | 'profit' | 'loss' | 'coins') => {
+        const sounds = {
+            buy: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+            profit: 'https://assets.mixkit.co/active_storage/sfx/1000/1000-preview.mp3', // Win/Coin
+            loss: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3', // Alert
+            coins: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'
+        };
+        const audio = new Audio(sounds[type]);
+        audio.play().catch(() => console.warn('Audio play blocked or failed'));
+    };
+
     const handleTrade = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage({ text: '', type: '' });
@@ -194,6 +206,14 @@ export default function Dashboard() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Trade failed');
+
+            // Play Sound
+            if (tradeForm.action === 'BUY') {
+                playSound('buy');
+            } else if (tradeForm.action === 'SELL') {
+                if (pnl > 0) playSound('profit');
+                else playSound('loss');
+            }
 
             // Trigger Gamification Confetti/Rekt for ANY P&L
             if (pnl > 0) {
