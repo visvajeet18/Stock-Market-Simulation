@@ -49,6 +49,7 @@ export default function Dashboard() {
     const [tradeEffect, setTradeEffect] = useState<{ type: 'win' | 'lose'; amount: number } | null>(null);
     const [supportMsg, setSupportMsg] = useState('');
     const [sendingSupport, setSendingSupport] = useState(false);
+    const [privateMessages, setPrivateMessages] = useState<any[]>([]);
 
     // Derived persistent event for continuous banner
     const breakingNews = announcements.find((a: any) => a.type === 'event');
@@ -98,6 +99,7 @@ export default function Dashboard() {
             const res = await fetch(`/api/messages?userId=${userId}`);
             if (res.ok) {
                 const data = await res.json();
+                setPrivateMessages(data);
                 if (data.length > 0) {
                     const latest = data[data.length - 1];
                     if (latest.id !== lastMsgIdRef.current) {
@@ -908,11 +910,34 @@ export default function Dashboard() {
                                             ))}
                                         </div>
                                     )}
+                                {/* Admin Messages Inbox */}
+                                <div>
+                                    <h4 style={{ fontSize: '0.85rem', color: '#c084fc', textTransform: 'uppercase', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                        📫 Messages from Admin
+                                        {privateMessages.length > 0 && <span style={{ background: '#ef4444', color: 'white', fontSize: '0.6rem', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>{privateMessages.length}</span>}
+                                    </h4>
+                                    {privateMessages.length === 0 ? (
+                                        <div style={{ color: '#64748b', fontSize: '0.8rem', padding: '1rem', background: 'rgba(15,23,42,0.4)', borderRadius: '8px', textAlign: 'center' }}>
+                                            No messages from admin yet.
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '200px', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                                            {privateMessages.slice().reverse().map((msg: any) => (
+                                                <div key={msg.id} style={{ padding: '0.75rem 1rem', background: 'rgba(139,92,246,0.1)', borderRadius: '8px', borderLeft: '3px solid #c084fc' }}>
+                                                    <p style={{ margin: 0, fontSize: '0.85rem', color: '#e2e8f0', lineHeight: '1.4' }}>{msg.message}</p>
+                                                    <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: '0.4rem' }}>
+                                                        {new Date(msg.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
 
                 {/* ── Live Market Grid ── */}
                 <div className="card" style={{ marginTop: '2rem' }}>
