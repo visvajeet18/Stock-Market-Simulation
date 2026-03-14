@@ -172,8 +172,8 @@ export default function Dashboard() {
     const playSound = (type: 'buy' | 'profit' | 'loss' | 'coins') => {
         const sounds = {
             buy: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-            profit: 'https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3', // Success chime (Short)
-            loss: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3', // Alert
+            profit: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3', // Alert/Drop (User preferred for Profit)
+            loss: 'https://assets.mixkit.co/active_storage/sfx/2006/2006-preview.mp3', // Negative notification (New Loss)
             coins: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'
         };
         const audio = new Audio(sounds[type]);
