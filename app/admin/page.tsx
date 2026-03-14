@@ -237,7 +237,7 @@ export default function AdminDashboard() {
 
         const data = await res.json();
         if (res.ok) {
-            setIpoForm({ symbol: '', name: '', sector: '', initialPrice: '', shares: '' });
+            setIpoForm({ symbol: '', name: '', sector: '', initialPrice: '', shares: '', logoUrl: '' });
             fetchAll();
             setTab('market'); // Jump to see the new stock
         } else {
