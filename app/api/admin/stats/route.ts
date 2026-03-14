@@ -24,6 +24,7 @@ export async function GET() {
             stockMeta[s.symbol] = {
                 name: s.name, sector: s.sector, beta: s.beta,
                 pe: s.pe, previousPrice: s.previousPrice, volatility: s.volatility,
+                logoUrl: s.logoUrl,
             };
         });
 

@@ -83,6 +83,10 @@ export async function writeDB(filename: string, data: any) {
                 if (payload.length > 0) {
                     const { error } = await supabase.from(collectionName).upsert(payload);
                     if (error) throw error;
+                } else if (data.length === 0) {
+                    // Handle clearing the collection
+                    const { error } = await supabase.from(collectionName).delete().neq('id', '0');
+                    if (error) throw error;
                 }
             }
             

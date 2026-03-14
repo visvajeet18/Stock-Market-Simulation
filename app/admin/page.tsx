@@ -34,6 +34,8 @@ export default function AdminDashboard() {
     const [ipoForm, setIpoForm] = useState({ symbol: '', name: '', sector: '', initialPrice: '', shares: '', logoUrl: '' });
     const [searchTerm, setSearchTerm] = useState('');
     const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+    const [autoTick, setAutoTick] = useState(false);
+    const [tickCountdown, setTickCountdown] = useState(10);
 
     // Security 
     const [anomalies, setAnomalies] = useState<any[]>([]);
@@ -57,6 +59,20 @@ export default function AdminDashboard() {
         const ti = setInterval(fetchSnapshot, 15000); // Poll every 15s instead of 2s to save Firestore quota
         return () => clearInterval(ti);
     }, [router]);
+
+    useEffect(() => {
+        if (!autoTick) return;
+        const interval = setInterval(async () => {
+            setTickCountdown(prev => {
+                if (prev <= 1) {
+                    triggerManualTick();
+                    return 10;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [autoTick]);
 
     const fetchSnapshot = async () => {
         // Just fetch stats, don't trigger a tick automatically to save quota
@@ -508,58 +524,84 @@ export default function AdminDashboard() {
 
                         {/* Stock Control Center */}
                         <div className="card">
-                            <div className="card-header">🎛️ Market Control Center</div>
+                            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                                <div>🎛️ Market Control Center</div>
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: 'rgba(15,23,42,0.4)', padding: '0.4rem 0.8rem', borderRadius: '20px', border: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: autoTick ? 'var(--success)' : '#94a3b8' }}>
+                                        {autoTick ? `⏳ Auto-Tick: ${tickCountdown}s` : '⏹ Auto-Tick Off'}
+                                    </div>
+                                    <button 
+                                        onClick={() => setAutoTick(!autoTick)}
+                                        style={{ 
+                                            padding: '0.2rem 0.5rem', 
+                                            fontSize: '0.7rem', 
+                                            borderRadius: '12px', 
+                                            border: 'none', 
+                                            background: autoTick ? 'var(--success)' : '#475569', 
+                                            color: 'white', 
+                                            cursor: 'pointer',
+                                            fontWeight: 700 
+                                        }}
+                                    >
+                                        {autoTick ? 'ENABLED' : 'DISABLED'}
+                                    </button>
+                                </div>
+                            </div>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '0.75rem', marginTop: '1rem' }}>
                                 {filteredStocks.map(symbol => {
                                     const meta = stats.stockMeta?.[symbol] ?? {};
                                     const isAuto = stats_stockAutoUpdates[symbol] !== false;
                                     const halted = stats.marketState?.haltedStocks?.includes(symbol);
                                     return (
-                                        <div key={symbol} style={{ padding: '1rem', background: 'rgba(15,23,42,0.5)', borderRadius: '10px', border: halted ? '1px solid #f59e0b' : '1px solid var(--border)' }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                                                    {meta.logoUrl && <img src={meta.logoUrl} className="stock-logo" alt="" onError={(e: any) => e.target.style.display = 'none'} />}
+                                        <div key={symbol} style={{ padding: '0.75rem', background: 'rgba(15,23,42,0.5)', borderRadius: '10px', border: halted ? '1px solid #f59e0b' : '1px solid var(--border)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                                <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                                                    {meta.logoUrl ? (
+                                                        <img src={meta.logoUrl} style={{ width: '28px', height: '28px', borderRadius: '4px', objectFit: 'contain', background: 'white', padding: '1px' }} alt="" onError={(e: any) => e.target.style.display = 'none'} />
+                                                    ) : (
+                                                        <div style={{ width: '28px', height: '28px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}>{symbol[0]}</div>
+                                                    )}
                                                     <div>
-                                                        <div style={{ fontWeight: 700 }}>{symbol}</div>
-                                                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>{meta.sector}</div>
+                                                        <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>{symbol}</div>
+                                                        <div style={{ fontSize: '0.65rem', color: '#64748b', maxWidth: '100px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meta.name || meta.sector}</div>
                                                     </div>
                                                 </div>
                                                 <div style={{ textAlign: 'right' }}>
-                                                    <div style={{ fontFamily: 'monospace', fontWeight: 700 }}>₹{stats_defaultStockPrices[symbol].toFixed(2)}</div>
-                                                    {halted && <span style={{ fontSize: '0.65rem', color: '#f59e0b' }}>⏸ HALTED</span>}
+                                                    <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.9rem' }}>₹{stats_defaultStockPrices[symbol].toFixed(2)}</div>
+                                                    {halted && <span style={{ fontSize: '0.6rem', color: '#f59e0b', fontWeight: 600 }}>⏯ HALTED</span>}
                                                 </div>
                                             </div>
-                                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.3rem' }}>
                                                 {halted ? (
                                                     <button onClick={() => handleStockUpdate(symbol, 'UNHALT')}
-                                                        style={{ flex: 1, minWidth: '70px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid #f59e0b', borderRadius: '4px', cursor: 'pointer' }}>
-                                                        ▶ Unhalt
+                                                        style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid #f59e0b', borderRadius: '4px', cursor: 'pointer' }}>
+                                                        Unhalt
                                                     </button>
                                                 ) : (
                                                     <button onClick={() => handleStockUpdate(symbol, 'HALT')}
-                                                        style={{ flex: 1, minWidth: '70px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '4px', cursor: 'pointer' }}>
-                                                        ⏸ Halt
+                                                        style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.5)', borderRadius: '4px', cursor: 'pointer' }}>
+                                                        Halt
                                                     </button>
                                                 )}
                                                 <button onClick={() => handleStockUpdate(symbol, 'TOGGLE_AUTO', !isAuto)}
-                                                    style={{ flex: 1, minWidth: '70px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: isAuto ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.15)', color: isAuto ? 'var(--success)' : '#94a3b8', border: `1px solid ${isAuto ? 'var(--success)' : '#475569'}`, borderRadius: '4px', cursor: 'pointer' }}>
-                                                    {isAuto ? '✓ Auto' : '✗ Manual'}
+                                                    style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: isAuto ? 'rgba(16,185,129,0.15)' : 'rgba(148,163,184,0.15)', color: isAuto ? 'var(--success)' : '#94a3b8', border: `1px solid ${isAuto ? 'var(--success)' : '#475569'}`, borderRadius: '4px', cursor: 'pointer' }}>
+                                                    {isAuto ? 'Auto' : 'Manual'}
+                                                </button>
+                                                <button onClick={() => handleDeleteStock(symbol)}
+                                                    style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '4px', cursor: 'pointer' }}>
+                                                    Delete
                                                 </button>
                                                 <button onClick={() => handleStockUpdate(symbol, 'HIKE', 5)}
-                                                    style={{ flex: 1, minWidth: '55px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: 'rgba(16,185,129,0.15)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '4px', cursor: 'pointer' }}>
+                                                    style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(16,185,129,0.15)', color: 'var(--success)', border: '1px solid var(--success)', borderRadius: '4px', cursor: 'pointer' }}>
                                                     +5%
                                                 </button>
                                                 <button onClick={() => handleStockUpdate(symbol, 'DROP', 5)}
-                                                    style={{ flex: 1, minWidth: '55px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: 'rgba(239,68,68,0.15)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '4px', cursor: 'pointer' }}>
+                                                    style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(239,68,68,0.15)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '4px', cursor: 'pointer' }}>
                                                     -5%
                                                 </button>
                                                 <button onClick={() => { const v = prompt(`Set exact price for ${symbol}:`); if (v && !isNaN(Number(v))) handleStockUpdate(symbol, 'SET_PRICE', Number(v)); }}
-                                                    style={{ flex: 1, minWidth: '60px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid #38bdf8', borderRadius: '4px', cursor: 'pointer' }}>
+                                                    style={{ padding: '0.35rem 0.2rem', fontSize: '0.65rem', background: 'rgba(56,189,248,0.15)', color: '#38bdf8', border: '1px solid #38bdf8', borderRadius: '4px', cursor: 'pointer' }}>
                                                     Set ₹
-                                                </button>
-                                                <button onClick={() => handleDeleteStock(symbol)}
-                                                    style={{ flex: 1, minWidth: '60px', padding: '0.35rem 0.4rem', fontSize: '0.7rem', background: 'rgba(239,68,68,0.1)', color: 'var(--danger)', border: '1px solid var(--danger)', borderRadius: '4px', cursor: 'pointer' }}>
-                                                    Delete
                                                 </button>
                                             </div>
                                         </div>
