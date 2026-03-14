@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     Chart as ChartJS, ArcElement, Tooltip, Legend,
@@ -81,14 +81,35 @@ export default function Dashboard() {
             fetchAnnouncements();
             fetchMarketState();
             fetchOrders(parsedUser.id);
-        }, 30000); // 30s polling for non-admin to save quota
+            fetchPrivateMessages(parsedUser.id);
+        }, 10000); // 10s polling for non-admin to see alerts faster
         
         fetchAnnouncements();
         fetchMarketState();
         fetchOrders(parsedUser.id);
+        fetchPrivateMessages(parsedUser.id);
         
         return () => clearInterval(interval);
     }, [router]);
+
+    const fetchPrivateMessages = async (userId: string) => {
+        try {
+            const res = await fetch(`/api/messages?userId=${userId}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.length > 0) {
+                    const latest = data[data.length - 1];
+                    if (latest.id !== lastMsgIdRef.current) {
+                        if (lastMsgIdRef.current !== null) {
+                            playSound('message');
+                            alert(`📬 NEW PRIVATE MESSAGE:\n\n${latest.message}`);
+                        }
+                        lastMsgIdRef.current = latest.id;
+                    }
+                }
+            }
+        } catch { /* silent */ }
+    };
 
     const fetchAnnouncements = async () => {
         try {
@@ -96,6 +117,10 @@ export default function Dashboard() {
             if (res.ok) {
                 const data = await res.json();
                 setAnnouncements(data);
+                if (data.length > lastAnnCountRef.current) {
+                    if (lastAnnCountRef.current > 0) playSound('announcement');
+                }
+                lastAnnCountRef.current = data.length;
             }
         } catch { /* silent */ }
     };
@@ -109,6 +134,14 @@ export default function Dashboard() {
                 if (newSentiment !== marketWeather) {
                     console.log(`[Dashboard] Sentiment changed: ${newSentiment}`);
                     setMarketWeather(newSentiment);
+                }
+
+                // Global Siren Trigger
+                if (data.sirenTrigger && data.sirenTrigger > lastSirenRef.current) {
+                    if (lastSirenRef.current !== 0) playSound('siren');
+                    lastSirenRef.current = data.sirenTrigger;
+                } else if (!lastSirenRef.current && data.sirenTrigger) {
+                    lastSirenRef.current = data.sirenTrigger;
                 }
             }
         } catch { /* silent */ }
@@ -168,13 +201,21 @@ export default function Dashboard() {
         } catch { /* silent */ }
     };
 
+    // Communication & Alert Monitoring
+    const lastSirenRef = useRef<number>(0);
+    const lastAnnCountRef = useRef<number>(0);
+    const lastMsgIdRef = useRef<string | null>(null);
+
     // Audio Helper
-    const playSound = (type: 'buy' | 'profit' | 'loss' | 'coins') => {
+    const playSound = (type: 'buy' | 'profit' | 'loss' | 'coins' | 'siren' | 'announcement' | 'message') => {
         const sounds = {
             buy: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-            profit: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3', // Alert/Drop (User preferred for Profit)
-            loss: 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3', // Short digital notification (New Loss)
-            coins: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3'
+            profit: 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3', 
+            loss: 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3', 
+            coins: 'https://assets.mixkit.co/active_storage/sfx/212/212-preview.mp3',
+            siren: 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3',
+            announcement: 'https://assets.mixkit.co/active_storage/sfx/2633/2633-preview.mp3',
+            message: 'https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3'
         };
         const audio = new Audio(sounds[type]);
         audio.play().catch(() => console.warn('Audio play blocked or failed'));

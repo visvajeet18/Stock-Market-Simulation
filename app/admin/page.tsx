@@ -323,6 +323,13 @@ export default function AdminDashboard() {
                     <button className="nav-btn" onClick={triggerManualTick} style={{ background: 'var(--accent)', color: '#0f172a' }} disabled={loading}>
                         {loading ? '⏳ Updating...' : '⚡ Force Market Tick'}
                     </button>
+                    <button className="nav-btn" onClick={async () => {
+                        if (!confirm('🚨 THIS WILL PLAY A LOUD SIREN FOR ALL USERS. Proceed?')) return;
+                        await fetch('/api/admin/siren', { method: 'POST', body: JSON.stringify({ adminId: 'admin-001' }) });
+                        alert('🚨 Siren Triggered!');
+                    }} style={{ background: '#ef4444', color: 'white' }}>
+                        🚨 Force Siren
+                    </button>
                     <button className="nav-btn" onClick={() => { 
                         const newTheme = theme === 'dark' ? 'light' : 'dark';
                         setTheme(newTheme);
