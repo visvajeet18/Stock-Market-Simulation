@@ -8,7 +8,7 @@ import { PRESET_EVENTS } from '@/lib/marketEvents';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
-type Tab = 'overview' | 'market' | 'corporate' | 'events' | 'students' | 'risk' | 'activity' | 'security';
+type Tab = 'overview' | 'market' | 'corporate' | 'events' | 'students' | 'risk' | 'activity' | 'security' | 'support';
 
 const SENTIMENT_CONFIG: Record<string, { label: string; color: string; desc: string }> = {
     bull: { label: '🟢 BULL', color: '#10b981', desc: 'Strong upward bias (+0.45% drift/tick)' },
@@ -245,6 +245,19 @@ export default function AdminDashboard() {
         }
     };
 
+    const filteredStocks = useMemo(() => {
+        const stats_defaultStockPrices = stats?.defaultStockPrices || {};
+        const stockMeta = stats?.stockMeta || {};
+        
+        return Object.keys(stats_defaultStockPrices)
+            .filter(symbol => 
+                symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                (stockMeta[symbol]?.sector || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (stockMeta[symbol]?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+            )
+            .sort((a, b) => a.localeCompare(b));
+    }, [stats?.defaultStockPrices, stats?.stockMeta, searchTerm]);
+
     if (loading || !stats) return <div className="auth-container"><h2 className="title-glow">Loading Admin Portal...</h2></div>;
 
     const stats_leaderboard = stats.leaderboard || [];
@@ -259,17 +272,6 @@ export default function AdminDashboard() {
     const totalTrades = stats_recentTransactions.length;
     const highRiskCount = risk.filter((r: any) => r.riskLevel === 'HIGH').length;
 
-    const filteredStocks = useMemo(() => {
-        if (!stats_defaultStockPrices) return [];
-        return Object.keys(stats_defaultStockPrices)
-            .filter(symbol => 
-                symbol.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                (stats.stockMeta?.[symbol]?.sector || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (stats.stockMeta?.[symbol]?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-            )
-            .sort((a, b) => a.localeCompare(b));
-    }, [stats_defaultStockPrices, stats.stockMeta, searchTerm]);
-
     const TABS: { id: Tab; label: string; icon: string }[] = [
         { id: 'overview', label: 'Overview', icon: '📊' },
         { id: 'market', label: 'Live Market', icon: '📈' },
@@ -279,7 +281,7 @@ export default function AdminDashboard() {
         { id: 'risk', label: `Risk Monitor${highRiskCount > 0 ? ` 🔴${highRiskCount}` : ''}`, icon: '🛡' },
         { id: 'activity', label: 'Activity', icon: '🔄' },
         { id: 'security', label: `Security Desk${anomalies.length > 0 ? ` 🚨${anomalies.length}` : ''}`, icon: '🕵️' },
-        { id: 'support' as any, label: 'Support Desk', icon: '🎧' },
+        { id: 'support', label: 'Support Desk', icon: '🎧' },
     ];
 
     return (
