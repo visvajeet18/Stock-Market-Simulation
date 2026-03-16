@@ -86,6 +86,21 @@ export default function AdminDashboard() {
         setLoading(false);
     };
 
+    const handleDeleteLoan = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this loan?')) return;
+        try {
+            const res = await fetch(`/api/loans?adminId=admin-001&id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setStats((prev: any) => ({
+                    ...prev,
+                    loans: prev?.loans ? prev.loans.filter((l: any) => l.id !== id) : []
+                }));
+            } else {
+                alert('Failed to delete loan');
+            }
+        } catch (err) { console.error(err); }
+    };
+
     const fetchAll = async () => {
         try {
             const [statsRes, riskRes, annRes, anomalyRes] = await Promise.all([
@@ -1056,7 +1071,7 @@ export default function AdminDashboard() {
                         {stats.loans.length === 0 ? <p style={{ color: '#64748b', marginTop: '1rem' }}>No loans yet.</p> : (
                             <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
                                 <table className="table">
-                                    <thead><tr><th>Date</th><th>Borrower</th><th>Lender</th><th>Amount</th><th>Rate</th><th>Status</th></tr></thead>
+                                    <thead><tr><th>Date</th><th>Borrower</th><th>Lender</th><th>Amount</th><th>Rate</th><th>Status</th><th>Actions</th></tr></thead>
                                     <tbody>
                                         {stats.loans.slice().reverse().map((l: any) => (
                                             <tr key={l.id} className="table-row-hover">
@@ -1066,6 +1081,11 @@ export default function AdminDashboard() {
                                                 <td style={{ fontWeight: 600 }}>₹{l.amount.toLocaleString()}</td>
                                                 <td style={{ color: 'var(--accent)' }}>{l.interestRate != null ? `${l.interestRate}%` : '—'}</td>
                                                 <td><span className={`badge ${l.status === 'ACTIVE' ? 'badge-danger' : l.status === 'COMPLETED' ? 'badge-success' : ''}`} style={{ fontSize: '0.7rem' }}>{l.status}</span></td>
+                                                <td>
+                                                    <button onClick={() => handleDeleteLoan(l.id)} style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '1.2rem', padding: '2px' }} title="Delete Loan">
+                                                        ×
+                                                    </button>
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>

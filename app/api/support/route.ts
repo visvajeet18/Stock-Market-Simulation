@@ -46,3 +46,30 @@ export async function GET(request: Request) {
     }
 }
 
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const adminId = searchParams.get('adminId');
+        const id = searchParams.get('id');
+
+        if (adminId !== 'admin-001') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        const supportMessages = await readDB('support_messages.json').catch(() => []);
+        
+        if (id) {
+            // Delete specific message
+            const filtered = supportMessages.filter((m: any) => m.id !== id);
+            await writeDB('support_messages.json', filtered);
+        } else {
+            // Clear all
+            await writeDB('support_messages.json', []);
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+}
+

@@ -40,6 +40,30 @@ export default function AdminSupport() {
         }
     };
 
+    const handleDeleteMessage = async (id: string) => {
+        if (!confirm('Are you sure you want to delete this message?')) return;
+        try {
+            const res = await fetch(`/api/support?adminId=admin-001&id=${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setMessages((prev: any[]) => prev.filter((m: any) => m.id !== id));
+            } else {
+                alert('Failed to delete message');
+            }
+        } catch (err) { console.error(err); }
+    };
+
+    const handleClearAll = async () => {
+        if (!confirm('Are you sure you want to clear all messages?')) return;
+        try {
+            const res = await fetch(`/api/support?adminId=admin-001`, { method: 'DELETE' });
+            if (res.ok) {
+                setMessages([]);
+            } else {
+                alert('Failed to clear messages');
+            }
+        } catch (err) { console.error(err); }
+    };
+
     const fetchStudents = async () => {
         try {
             const res = await fetch('/api/admin/stats');
@@ -118,16 +142,28 @@ export default function AdminSupport() {
                 </div>
 
                 <div className="card">
-                    <div className="card-header">User Messages ({messages.length})</div>
+                    <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>User Messages ({messages.length})</span>
+                        {messages.length > 0 && (
+                            <button onClick={handleClearAll} style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', padding: '0.25rem 0.75rem', fontSize: '0.75rem', border: '1px solid currentColor' }}>
+                                Clear All
+                            </button>
+                        )}
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem', maxHeight: '500px', overflowY: 'auto' }}>
                         {messages.length === 0 ? (
                             <p style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>No messages from users yet.</p>
                         ) : (
                             messages.map((m: any) => (
-                                <div key={m.id} className="market-stat" style={{ padding: '1rem', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', borderLeft: '4px solid var(--primary)' }}>
+                                <div key={m.id} className="market-stat" style={{ padding: '1rem', background: 'rgba(15, 23, 42, 0.4)', borderRadius: '12px', borderLeft: '4px solid var(--primary)', position: 'relative' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                                         <span style={{ fontWeight: 800, color: 'var(--primary)', fontSize: '0.85rem' }}>@{m.username}</span>
-                                        <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{new Date(m.timestamp).toLocaleTimeString()}</span>
+                                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                            <span style={{ fontSize: '0.7rem', color: '#64748b' }}>{new Date(m.timestamp).toLocaleTimeString()}</span>
+                                            <button onClick={() => handleDeleteMessage(m.id)} style={{ background: 'transparent', color: '#64748b', border: 'none', cursor: 'pointer', fontSize: '1rem', padding: '2px' }} title="Delete Message">
+                                                ×
+                                            </button>
+                                        </div>
                                     </div>
                                     <p style={{ margin: 0, color: '#e2e8f0', fontSize: '0.9rem', lineHeight: '1.4' }}>{m.message}</p>
                                 </div>
