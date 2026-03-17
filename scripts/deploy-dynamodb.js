@@ -2,10 +2,10 @@ const { DynamoDBClient, CreateTableCommand, ListTablesCommand, DescribeTableComm
 require('dotenv').config({ path: '.env.local' });
 
 const client = new DynamoDBClient({
-    region: process.env.AWS_REGION || 'us-east-1',
+    region: process.env.MY_AWS_REGION || 'us-east-1',
     credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.MY_AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.MY_AWS_SECRET_ACCESS_KEY,
     }
 });
 
@@ -67,8 +67,8 @@ async function createTableIfNotExists(tableName) {
 }
 
 async function main() {
-    if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-        console.error("❌ Error: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY must be set in .env.local");
+    if (!process.env.MY_AWS_ACCESS_KEY_ID || !process.env.MY_AWS_SECRET_ACCESS_KEY) {
+        console.error("❌ Error: MY_AWS_ACCESS_KEY_ID and MY_AWS_SECRET_ACCESS_KEY must be set in .env.local");
         process.exit(1);
     }
 
