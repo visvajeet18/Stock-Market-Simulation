@@ -1,7 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { supabase } from './supabase';
+import { ddbDocClient as ddb } from './dynamodb';
+import { ScanCommand, PutCommand, BatchWriteCommand, DeleteCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 
@@ -12,37 +13,30 @@ const USE_CLOUD_DB = process.env.USE_FIRESTORE === 'true' || process.env.NODE_EN
 
 // ─── Simple In-Memory Cache ──────────────────────────────────────────────────
 const cache: Record<string, { data: any; expires: number }> = {};
-const CACHE_TTL = 0; // Disable memory cache for Supabase to avoid stale data across Lambdas
+const CACHE_TTL = 0; // Disable memory cache for DynamoDB too initially
 
 export async function readDB(filename: string) {
     const collectionName = filename.replace('.json', '');
 
     if (USE_CLOUD_DB) {
-        // Check cache first
         if (cache[filename] && cache[filename].expires > Date.now()) {
             return cache[filename].data;
         }
 
         try {
-            const { data: snapshot, error } = await supabase.from(collectionName).select('*');
-            if (error) throw error;
-            let result: any;
-
-            if (!snapshot || snapshot.length === 0) {
-                result = filename === 'market_state.json' ? {} : [];
-            } else if (filename === 'market_state.json') {
-                const currentDoc = snapshot.find((d: any) => d.id === 'current');
-                result = currentDoc ? currentDoc.data : snapshot[0].data;
+            if (filename === 'market_state.json') {
+                const { Item } = await ddb.send(new GetCommand({ TableName: collectionName, Key: { id: 'current' } }));
+                const result = Item ? Item.data : {};
+                cache[filename] = { data: result, expires: Date.now() + CACHE_TTL };
+                return result;
             } else {
-                result = snapshot.map((doc: any) => ({ id: doc.id, ...doc.data }));
+                const { Items } = await ddb.send(new ScanCommand({ TableName: collectionName }));
+                const result = (Items || []).map((doc: any) => ({ id: doc.id, ...doc.data }));
+                cache[filename] = { data: result, expires: Date.now() + CACHE_TTL };
+                return result;
             }
-
-            // Update cache
-            cache[filename] = { data: result, expires: Date.now() + CACHE_TTL };
-            return result;
         } catch (error) {
-            console.error(`Supabase Read Error [${collectionName}]:`, error);
-            // Fallback to cache if available
+            console.error(`DynamoDB Read Error [${collectionName}]:`, error);
             if (cache[filename]) return cache[filename].data;
             return filename === 'market_state.json' ? {} : [];
         }
@@ -68,38 +62,43 @@ export async function writeDB(filename: string, data: any) {
     if (USE_CLOUD_DB) {
         try {
             if (filename === 'market_state.json') {
-                const { error } = await supabase.from(collectionName).upsert({ id: 'current', data });
-                if (error) throw error;
+                await ddb.send(new PutCommand({
+                    TableName: collectionName,
+                    Item: { id: 'current', data }
+                }));
             } else if (Array.isArray(data)) {
-                // Optimized Update: UPSERT ONLY
-                // We no longer delete missing items here to prevent race conditions across serverless instances.
-                // Concurrent lambdas reading an array and writing back missing elements used to wipe out new inserts.
                 const payload = data.map(item => {
                     const id = item.id ? String(item.id) : crypto.randomUUID();
                     const { id: _, ...cleanItem } = item;
                     return { id, data: cleanItem };
                 });
-                
+
                 if (payload.length > 0) {
-                    const { error } = await supabase.from(collectionName).upsert(payload);
-                    if (error) throw error;
+                    for (let i = 0; i < payload.length; i += 25) {
+                        const chunk = payload.slice(i, i + 25);
+                        const writeRequests = chunk.map(item => ({
+                            PutRequest: { Item: item }
+                        }));
+                        await ddb.send(new BatchWriteCommand({
+                            RequestItems: { [collectionName]: writeRequests }
+                        }));
+                    }
                 } else if (data.length === 0) {
-                    // Handle clearing the collection
-                    const { error } = await supabase.from(collectionName).delete().neq('id', '0');
-                    if (error) throw error;
+                    const { Items } = await ddb.send(new ScanCommand({ TableName: collectionName, ProjectionExpression: 'id' }));
+                    if (Items && Items.length > 0) {
+                        const ids = Items.map((i: any) => i.id);
+                        await deleteManyDB(filename, ids);
+                    }
                 }
             }
-            
-            // Sync cache
             cache[filename] = { data: data, expires: Date.now() + CACHE_TTL };
             return;
         } catch (error) {
-            console.error(`Supabase Write Error [${collectionName}]:`, error);
+            console.error(`DynamoDB Write Error [${collectionName}]:`, error);
             throw error;
         }
     }
 
-    // Local JSON Fallback with Locks
     const prev = writeLocks[filename] ?? Promise.resolve();
     const next = prev.then(async () => {
         const filePath = path.join(DATA_DIR, filename);
@@ -115,13 +114,12 @@ export async function deleteDB(filename: string, id: string) {
     const collectionName = filename.replace('.json', '');
     if (USE_CLOUD_DB) {
         try {
-            const { error } = await supabase.from(collectionName).delete().eq('id', id);
-            if (error) throw error;
+            await ddb.send(new DeleteCommand({ TableName: collectionName, Key: { id } }));
             if (cache[filename] && Array.isArray(cache[filename].data)) {
                 cache[filename].data = cache[filename].data.filter((i: any) => i.id !== id);
             }
         } catch (error) {
-            console.error(`Supabase Delete Error [${collectionName}]:`, error);
+            console.error(`DynamoDB Delete Error [${collectionName}]:`, error);
             throw error;
         }
     } else {
@@ -138,13 +136,20 @@ export async function deleteManyDB(filename: string, ids: string[]) {
     const collectionName = filename.replace('.json', '');
     if (USE_CLOUD_DB) {
         try {
-            const { error } = await supabase.from(collectionName).delete().in('id', ids);
-            if (error) throw error;
+            for (let i = 0; i < ids.length; i += 25) {
+                const chunk = ids.slice(i, i + 25);
+                const deleteRequests = chunk.map(id => ({
+                    DeleteRequest: { Key: { id } }
+                }));
+                await ddb.send(new BatchWriteCommand({
+                    RequestItems: { [collectionName]: deleteRequests }
+                }));
+            }
             if (cache[filename] && Array.isArray(cache[filename].data)) {
                 cache[filename].data = cache[filename].data.filter((i: any) => !ids.includes(i.id));
             }
         } catch (error) {
-            console.error(`Supabase DeleteMany Error [${collectionName}]:`, error);
+            console.error(`DynamoDB DeleteMany Error [${collectionName}]:`, error);
             throw error;
         }
     } else {
@@ -155,4 +160,3 @@ export async function deleteManyDB(filename: string, ids: string[]) {
         }
     }
 }
-
